@@ -195,6 +195,7 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
       do
         putStrLn ("\nYour hand:         " ++ show pCards)
         putStrLn ("Computer's hand:   " ++ show cCards)
+        putStrLn ("Current River      " ++ show river)
         putStrLn ("Your money:        " ++ show umoney)
         putStrLn ("Computer's money:  " ++ show aimoney)
         putStrLn ("Current pool:      " ++ show value)
