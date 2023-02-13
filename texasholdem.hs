@@ -9,6 +9,7 @@ import Data.Maybe (fromJust)
 import Data.Char (isDigit)
 import Text.Read
 import Debug.Trace
+import Data.Array.IO
 
 -- state consists of internal state and whether a player can Hit again or not
 data State = State InternalState Bool Bool
@@ -74,10 +75,30 @@ blackjack (Stand) (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanH
     | currPlayer = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) False cCanHit)
     | otherwise = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) pCanHit False)
 
- 
+ -- Randomly shuffles deck of cards
+-- -- algorithm for shuffle taken from https://wiki.haskell.org/Random_shuffle
+-- -- | Randomly shuffle a list
+-- -- /O(N)/
+shuffle :: [a] -> IO [a]
+shuffle xs = do
+        ar <- newArray n xs
+        forM [1..n] $ \i -> do
+            j <- randomRIO (i,n)
+            vi <- readArray ar i
+            vj <- readArray ar j
+            writeArray ar j vi
+            return vj
+    
+    where
+      n = length xs
+      newArray :: Int -> [a] -> IO (IOArray Int a)
+      newArray n xs =  newListArray (1,n) xs
+
 
 {-----------HELPER FUNCTIONS-----------}
-
+-- State (pCards, cCards, deck, river, currPlayer)
+--startingDraw :: State -> State
+--startingDraw (State (pCards, cCards, deck, river, currPlayer)) = drawFromDeck deck 
 -- returns card drawn and new deck of cards (nth card is drawn from deck)
 drawFromDeck :: [Card] -> Int -> (Card, [Card])
 drawFromDeck deck n = (deck !! n, [card | card <- deck, card /= (deck !! n)])
@@ -174,6 +195,7 @@ play game state (umoney, aimoney) =
       putStrLn("\n--------------------------\n");
       putStrLn ("New game - select who starts first:\n1 = quit, 2 = you, 3 = computer")
       line <- validInput
+
       --num <- randomRIO (0, (length deck) - 1) :: IO Int
       if line == 1 then
         do
