@@ -10,6 +10,7 @@ import Data.Char (isDigit)
 import Text.Read
 import Debug.Trace
 import Data.Array.IO
+import GHC.IO.Unsafe
 
 -- state consists of internal state and whether a player can Hit again or not
 data State = State InternalState Bool Bool
@@ -40,6 +41,8 @@ data Result = EndOfGame Bool State
             | Tie State
          deriving (Eq, Show)
 
+deckDemo:: [Card]
+deckDemo = [('s',4),('h',8),('c',9),('d',7)]
 {-
 Actions:
 		- Hit n = take another card (of index n, to be used by an external RNG)
@@ -75,7 +78,8 @@ blackjack (Stand) (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanH
     | currPlayer = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) False cCanHit)
     | otherwise = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) pCanHit False)
 
- -- Randomly shuffles deck of cards
+
+-- Randomly shuffles deck of cards
 -- -- algorithm for shuffle taken from https://wiki.haskell.org/Random_shuffle
 -- -- | Randomly shuffle a list
 -- -- /O(N)/
@@ -94,12 +98,26 @@ shuffle xs = do
       newArray :: Int -> [a] -> IO (IOArray Int a)
       newArray n xs =  newListArray (1,n) xs
 
+-- 
+processShuffledDeck :: IO [Card] -> [Card]
+processShuffledDeck deck = unsafePerformIO deck
 
 {-----------HELPER FUNCTIONS-----------}
 -- State (pCards, cCards, deck, river, currPlayer)
---startingDraw :: State -> State
---startingDraw (State (pCards, cCards, deck, river, currPlayer)) = drawFromDeck deck 
+startingDraw :: Int -> State -> State
+startingDraw 0 (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit) = State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit
+startingDraw n (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit) 
+  | n > 5 = startingDraw (n-1) (State (newCard:pCards, cCards, shuffledDeck, river, currPlayer) pCanHit cCanHit)
+  | n > 3 =  startingDraw (n-1) (State (pCards, newCard: cCards, shuffledDeck, river, currPlayer) pCanHit cCanHit)
+  | otherwise = startingDraw (n-1) (State (pCards, cCards, shuffledDeck, newCard:river, currPlayer) pCanHit cCanHit)
+    where 
+        shuffleDeck = shuffle deck
+        shuffledDeck = processShuffledDeck shuffleDeck 
+        (newCard,newDeck) = drawFromDeck shuffledDeck 1
+
 -- returns card drawn and new deck of cards (nth card is drawn from deck)
+
+
 drawFromDeck :: [Card] -> Int -> (Card, [Card])
 drawFromDeck deck n = (deck !! n, [card | card <- deck, card /= (deck !! n)])
 
@@ -122,6 +140,7 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit)
 -- averages the card values in the deck
 avrg :: [Card] -> Int
 avrg deck = sumCards deck `div` length deck
+
 
 
 
@@ -190,12 +209,12 @@ start game state =
 -- Start the game (called by start)
 play :: Game -> State -> Bet -> IO Bet
 play game state (umoney, aimoney) =
-  let (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit) = state in
+  let newState = startingDraw 7 state
+      (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit) = newState in
     do
       putStrLn("\n--------------------------\n");
       putStrLn ("New game - select who starts first:\n1 = quit, 2 = you, 3 = computer")
       line <- validInput
-
       --num <- randomRIO (0, (length deck) - 1) :: IO Int
       if line == 1 then
         do
