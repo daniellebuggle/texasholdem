@@ -107,9 +107,9 @@ processShuffledDeck deck = unsafePerformIO deck
 startingDraw :: Int -> State -> State
 startingDraw 0 (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit) = State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit
 startingDraw n (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit) 
-  | n > 5 = startingDraw (n-1) (State (newCard:pCards, cCards, shuffledDeck, river, currPlayer) pCanHit cCanHit)
-  | n > 3 =  startingDraw (n-1) (State (pCards, newCard: cCards, shuffledDeck, river, currPlayer) pCanHit cCanHit)
-  | otherwise = startingDraw (n-1) (State (pCards, cCards, shuffledDeck, newCard:river, currPlayer) pCanHit cCanHit)
+  | n > 5 = startingDraw (n-1) (State (newCard:pCards, cCards, newDeck, river, currPlayer) pCanHit cCanHit)
+  | n > 3 =  startingDraw (n-1) (State (pCards, newCard: cCards, newDeck, river, currPlayer) pCanHit cCanHit)
+  | otherwise = startingDraw (n-1) (State (pCards, cCards, newDeck, newCard:river, currPlayer) pCanHit cCanHit)
     where 
         shuffleDeck = shuffle deck
         shuffledDeck = processShuffledDeck shuffleDeck 
