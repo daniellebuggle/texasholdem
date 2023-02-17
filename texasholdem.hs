@@ -11,6 +11,7 @@ import Text.Read
 import Debug.Trace
 import Data.Array.IO
 import GHC.IO.Unsafe
+import Data.List
 
 -- state consists of internal state and whether a player can Hit again or not
 data State = State InternalState Bool Bool Bool
@@ -141,6 +142,28 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
         pSum = sumCards pCards
         cSum = sumCards cCards
 
+
+-- checks best hand and returns who wins
+
+
+
+checkForPair:: [Card] -> ([Char], Int)
+checkForPair hand = case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
+                      Just xs -> ("Pair", snd $ head xs)
+                      Nothing -> ("Pair", 0)
+
+checkForThree:: [Card] -> ([Char], Int)
+checkForThree hand = case find (\x -> length x == 3) [filter (\c -> snd c == v) hand | v <- [1..13]] of
+                      Just xs -> ("Three of a Kind", snd $ head xs)
+                      Nothing -> ("Three of a Kind", 0)
+                   
+checkForFour:: [Card] -> ([Char], Int)
+checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) hand | v <- [1..13]] of
+                      Just xs -> ("Four of a Kind", snd $ head xs)
+                      Nothing -> ("Four of a Kind", 0)  
+
+
+ 
 -- averages the card values in the deck
 avrg :: [Card] -> Int
 avrg deck = sumCards deck `div` length deck
@@ -249,9 +272,16 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
         putStrLn ("Can you hit:       " ++ show pCanHit)
         putStrLn ("Can AI hit:        " ++ show cCanHit)
         num <- randomRIO (0, (length deck) - 1) :: IO Int
+
+        if fiveCardsDrawn then
+          do 
+            putStrLn("howdy")
+            ai_play game (game (Stand) state) (umoney, aimoney) value 1 0
+        else 
+
         --if pCanHit == False then
         --   ai_play game (game (Stand) state) (umoney, aimoney) value
-        do
+          do
             --putStrLn ("How much do you want to bet?")
             putStrLn ("Do you want to check (1), bet(2) or fold(3)?")
             line <- validInput
