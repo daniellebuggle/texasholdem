@@ -162,6 +162,24 @@ checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) h
                       Just xs -> ("Four of a Kind", snd $ head xs)
                       Nothing -> ("Four of a Kind", 0)  
 
+checkForTwoPair:: [Card] -> ([Char], Int)
+checkForTwoPair hand = case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
+                       Just xs -> ("Pair", snd $ head xs)
+                       Nothing -> ("Pair", 0)
+
+
+checkForStraight :: [Card] -> ([Char], Int)     --removes dupicate cards, checks for straight by minusing value of top card from bottom, no value of straight returned
+checkForStraight cards =
+    let sortedCards = sortOn snd cards
+    in length (nubBy (\(_, r1) (_, r2) -> r1 == r2) sortedCards) == length sortedCards &&
+       snd (last sortedCards) - snd (head sortedCards) == length sortedCards - 1
+
+
+checkForFlush :: [Card] -> ([Char], Int)        --doesn't check for just 5 cards, doesn't check for the value of flush
+checkForFlush cards =
+    let suits = map fst cards
+    in all (== head suits) (tail suits)
+
 
  
 -- averages the card values in the deck
