@@ -147,14 +147,17 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
 
 
 
+sortCardsAscending :: [Card] -> [Card]
+sortCardsAscending hand = sortOn snd hand
+
 checkHighCard :: [Card] -> Int -> ([Char], Int)         --Gets the highest value card from a list of cards
 checkHighCard [] cardNum = ("High Card", cardNum)
 checkHighCard (h:t) cardNum = if snd h > cardNum
                               then checkHighCard t (snd h)
                               else checkHighCard t cardNum
 
-checkForPair :: [Card] -> Int -> ([Char], Int)      --Checks for a pair. If there are multiple pairs, the mode determines whether the 
-checkForPair hand mode = if mode == 0                          --higher pair or lower pair is returned
+checkForPair :: [Card] -> Int -> ([Char], Int)      --Checks for a pair. If there are multiple pairs, higherPair determines whether the 
+checkForPair hand higherPair = if higherPair == 0                          --higher pair or lower pair is returned
                          then case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
                                Just xs -> ("Pair", snd $ head xs)
                                Nothing -> ("Pair", 0)
@@ -177,14 +180,16 @@ checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) h
                       Just xs -> ("Four of a Kind", snd $ head xs)
                       Nothing -> ("Four of a Kind", 0)  
 
-checkForStraight :: [Card] -> ([Char], Int)          --Need to sort by card value in ascending order
-checkForStraight [] = ("No straight", 0)
-checkForStraight [x] = ("Straight", snd x)
-checkForStraight (x:y:xs) = if snd y == snd x + 1
-                      then checkForStraight (y:xs)
-                      else if snd y == snd x && length (group (snd <$> (x:y:xs))) == 5
-                           then ("Straight", snd x)
-                           else ("No straight", 0)
+
+checkForStraight :: [Card] -> ([Char], Int)          --Need to sort by card value in ascending order using sortCardsAscending function before calling
+checkForStraight (a:b:c:d:e:f:g:[]) = if [snd c, snd d, snd e, snd f, snd g] == [snd c, snd c+1, snd c+2, snd c+3, snd c+4]
+                                      then ("Straight", snd g)
+                                      else if [snd b, snd c, snd d, snd e, snd f] == [snd b, snd b+1, snd b+2, snd b+3, snd b+4]
+                                           then ("Straight", snd f)
+                                           else if [snd a, snd b, snd c, snd d, snd e] == [snd a, snd a+1, snd a+2, snd a+3, snd a+4]
+                                                then ("Straight", snd e)
+                                                else ("No straight", 0)
+                    
 
 checkForFlush :: [Card] -> ([Char], Int)    --checks for flush, better flush is the one with the highest card
 checkForFlush [] = ("No Flush", 0)
@@ -201,6 +206,26 @@ checkForFlush hand = if length diamonds == 5
                            hearts = filter (\c -> fst c == 'h') hand
                            clubs = filter (\c -> fst c == 'c') hand
                            spades = filter (\c -> fst c == 's') hand
+
+checkForFullhouse :: [Card] -> ([Char], Int)
+checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 0))
+                         then ("Fullhouse", snd (checkForThree hand) + snd (checkForPair hand 0))
+                         else if (snd (checkForThree hand) /= snd (checkForPair hand 1))
+                              then ("Fullhouse", snd (checkForThree hand) + snd (checkForPair hand 0))
+                              else ("No Fullhouse", 0)
+
+checkForStraightFlush :: [Card] -> ([Char], Int)        --Checks for a straight flush, parameter list needs to be sorted by card rank
+checkForStraightFlush hand =
+  case hand of
+    (a:b:c:d:e:f:g:[]) ->
+      if map snd [c, d, e, f, g] == [snd c, snd c+1, snd c+2, snd c+3, snd c+4] && (snd (checkForFlush [c,d,e,f,g]) == snd g)
+        then ("Straight Flush", snd g)
+        else if map snd [b, c, d, e, f] == [snd b, snd b+1, snd b+2, snd b+3, snd b+4] && (snd (checkForFlush [b,c,d,e,f]) == snd f)
+          then ("Straight Flush", snd f)
+          else if map snd [a, b, c, d, e] == [snd a, snd a+1, snd a+2, snd a+3, snd a+4] && (snd (checkForFlush [a,b,c,d,e]) == snd e)
+            then ("Straight Flush", snd e)
+            else ("No straight Flush", 0)
+    _ -> ("Invalid input", 0)
 
 
  
