@@ -147,38 +147,60 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
 
 
 
-checkForPair:: [Card] -> ([Char], Int)
-checkForPair hand = case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
-                      Just xs -> ("Pair", snd $ head xs)
-                      Nothing -> ("Pair", 0)
+checkHighCard :: [Card] -> Int -> ([Char], Int)         --Gets the highest value card from a list of cards
+checkHighCard [] cardNum = ("High Card", cardNum)
+checkHighCard (h:t) cardNum = if snd h > cardNum
+                              then checkHighCard t (snd h)
+                              else checkHighCard t cardNum
 
-checkForThree:: [Card] -> ([Char], Int)
+checkForPair :: [Card] -> Int -> ([Char], Int)      --Checks for a pair. If there are multiple pairs, the mode determines whether the 
+checkForPair hand mode = if mode == 0                          --higher pair or lower pair is returned
+                         then case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
+                               Just xs -> ("Pair", snd $ head xs)
+                               Nothing -> ("Pair", 0)
+                         else case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- reverse [1..13]] of
+                               Just xs -> ("Pair", snd $ head xs)
+                               Nothing -> ("Pair", 0)
+
+checkForTwoPair :: [Card] -> ([Char], Int)
+checkForTwoPair hand = if checkForPair hand 0 == checkForPair hand 1
+                       then ("No Two Pair", 0)
+                       else ("Two Pair", snd (checkForPair hand 0) + snd (checkForPair hand 1))
+
+checkForThree :: [Card] -> ([Char], Int)
 checkForThree hand = case find (\x -> length x == 3) [filter (\c -> snd c == v) hand | v <- [1..13]] of
                       Just xs -> ("Three of a Kind", snd $ head xs)
                       Nothing -> ("Three of a Kind", 0)
                    
-checkForFour:: [Card] -> ([Char], Int)
+checkForFour :: [Card] -> ([Char], Int)
 checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) hand | v <- [1..13]] of
                       Just xs -> ("Four of a Kind", snd $ head xs)
                       Nothing -> ("Four of a Kind", 0)  
 
-checkForTwoPair:: [Card] -> ([Char], Int)
-checkForTwoPair hand = case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
-                       Just xs -> ("Pair", snd $ head xs)
-                       Nothing -> ("Pair", 0)
+checkForStraight :: [Card] -> ([Char], Int)          --Need to sort by card value in ascending order
+checkForStraight [] = ("No straight", 0)
+checkForStraight [x] = ("Straight", snd x)
+checkForStraight (x:y:xs) = if snd y == snd x + 1
+                      then checkForStraight (y:xs)
+                      else if snd y == snd x && length (group (snd <$> (x:y:xs))) == 5
+                           then ("Straight", snd x)
+                           else ("No straight", 0)
 
-
-checkForStraight :: [Card] -> ([Char], Int)     --removes dupicate cards, checks for straight by minusing value of top card from bottom, no value of straight returned
-checkForStraight cards =
-    let sortedCards = sortOn snd cards
-    in length (nubBy (\(_, r1) (_, r2) -> r1 == r2) sortedCards) == length sortedCards &&
-       snd (last sortedCards) - snd (head sortedCards) == length sortedCards - 1
-
-
-checkForFlush :: [Card] -> ([Char], Int)        --doesn't check for just 5 cards, doesn't check for the value of flush
-checkForFlush cards =
-    let suits = map fst cards
-    in all (== head suits) (tail suits)
+checkForFlush :: [Card] -> ([Char], Int)    --checks for flush, better flush is the one with the highest card
+checkForFlush [] = ("No Flush", 0)
+checkForFlush hand = if length diamonds == 5
+                        then ("Diamond Flush", snd (checkHighCard diamonds 0))
+                        else if length hearts == 5
+                             then ("Heart Flush", snd (checkHighCard hearts 0))
+                             else if length clubs == 5
+                                  then ("Club Flush", snd (checkHighCard clubs 0))
+                                  else if length spades == 5
+                                       then ("Spade Flush", snd (checkHighCard spades 0)) 
+                                       else ("No Flush", 0)
+                     where diamonds = filter (\c -> fst c == 'd') hand
+                           hearts = filter (\c -> fst c == 'h') hand
+                           clubs = filter (\c -> fst c == 'c') hand
+                           spades = filter (\c -> fst c == 's') hand
 
 
  
