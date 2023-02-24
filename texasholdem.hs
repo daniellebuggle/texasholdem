@@ -185,7 +185,7 @@ checkHand handWRiver hand
   | snd twoPair /= 0 = twoPair
   | snd pair /= 0 = pair
   | otherwise = checkHighCard hand 1
-  where straightFlush = checkForStraightFlush handWRiver
+  where straightFlush = checkForStraightFlush (sortCardsBySuit handWRiver)
         fourOfAKind = checkForFour handWRiver
         fullHouse = checkForFullhouse handWRiver
         flush = checkForFlush handWRiver
@@ -201,7 +201,7 @@ sortCardsAscending :: [Card] -> [Card]
 sortCardsAscending hand = sortOn snd hand
 
 
--- Define a function that compares two cards by their suit (i.e., by the first element of the tuple)
+-- | Compares two cards by their suit (i.e., by the first element of the tuple)
 -- 
 -- >>> sortCardsBySuit [('s', 1), ('d', 13), ('c', 10), ('d', 2), ('s', 2)]
 -- [('c',10),('d',2),('d',13),('s',1),('s',2)]
@@ -210,7 +210,7 @@ compareCardsBySuit (suit1, rank1) (suit2, rank2)
   | suit1 == suit2 = compare rank1 rank2 -- If the suits are the same, compare the ranks
   | otherwise      = compare suit1 suit2 -- Otherwise, compare the suits
 
--- Define a function that sorts a list of cards by suit
+-- Sorts a list of cards by suit
 sortCardsBySuit :: [Card] -> [Card]
 sortCardsBySuit = sortBy compareCardsBySuit
 
