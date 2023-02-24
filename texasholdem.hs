@@ -12,6 +12,7 @@ import Debug.Trace
 import Data.Array.IO
 import GHC.IO.Unsafe
 import Data.List
+import Control.Exception (handle)
 
 -- state consists of internal state and whether a player can Hit again or not
 data State = State InternalState Bool Bool Bool
@@ -142,11 +143,26 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
         pSum = sumCards pCards
         cSum = sumCards cCards
 
+-- checks whether the ai or the player has the better hand
+-- takes in current state of the game and returns a Result type 
+--checkWinner:: State -> Result 
+--checkWinner (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
+--    |
+
+checkHand:: [Card] -> ([Char], Int)
+checkHand hand 
+  | snd (checkForStraightFlush hand) /= 0 = checkForStraightFlush hand
+  | snd (checkForFour hand) /= 0 = checkForFour hand
+  | snd (checkForFullhouse hand) /= 0 = checkForFullhouse hand
+  | snd (checkForFlush hand) /= 0 = checkForFlush hand
+  | snd (checkForStraight hand) /= 0 = checkForStraight hand
+  | snd (checkForThree hand) /= 0 = checkForThree hand
+  | snd (checkForTwoPair hand) /= 0 =checkForTwoPair hand
+  | snd (checkForPair hand 0) /= 0 = checkForPair hand 0
+  | otherwise = checkHighCard hand 1
+
 
 -- checks best hand and returns who wins
-
-
-
 sortCardsAscending :: [Card] -> [Card]
 sortCardsAscending hand = sortOn snd hand
 
@@ -214,6 +230,7 @@ checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 
                               then ("Fullhouse", snd (checkForThree hand) + snd (checkForPair hand 0))
                               else ("No Fullhouse", 0)
 
+
 checkForStraightFlush :: [Card] -> ([Char], Int)        --Checks for a straight flush, parameter list needs to be sorted by card rank
 checkForStraightFlush hand =
   case hand of
@@ -228,7 +245,7 @@ checkForStraightFlush hand =
     _ -> ("Invalid input", 0)
 
 
- 
+
 -- averages the card values in the deck
 avrg :: [Card] -> Int
 avrg deck = sumCards deck `div` length deck
@@ -344,7 +361,7 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
             ai_play game (game (Stand) state) (umoney, aimoney) value 1 0
         else 
 
-        --if pCanHit == False then
+        --  if pCanHit == False then
         --   ai_play game (game (Stand) state) (umoney, aimoney) value
           do
             --putStrLn ("How much do you want to bet?")
