@@ -286,7 +286,7 @@ checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 
                               then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
                               else ("No Full House", 0)
 
--- Checks for a straight flush, parameter list needs to be sorted by card rank
+-- Checks for a straight flush, parameter list needs to be sorted by card suit
 checkForStraightFlush :: [Card] -> ([Char], Int)        
 checkForStraightFlush hand =
   case hand of
