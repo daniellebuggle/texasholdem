@@ -13,6 +13,7 @@ import Data.Array.IO
 import GHC.IO.Unsafe
 import Data.List
 import Control.Exception (handle)
+import GHC.Cmm.Dataflow (changedIf)
 
 -- state consists of internal state and whether a player can Hit again or not
 data State = State InternalState Bool Bool Bool
@@ -147,19 +148,72 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
 -- takes in current state of the game and returns a Result type 
 --checkWinner:: State -> Result 
 --checkWinner (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
---    |
+--  | 
+
+
+-- compares the hands of both the player and AI
+-- returns an Int for the winner - 1 for the player, 0 for the AI, 2 for a tie 
+compareHands:: ([Char], Int) -> ([Char], Int) -> Int
+compareHands pHand cHand 
+  | straightFlush /= 3 = straightFlush
+  | fourOfAKind /= 3 = fourOfAKind
+  | fullHouse /= 3 = fullHouse
+  | flush /= 3 = flush
+  | straight /=3 = straight
+  | threeOfAKind /=3 = threeOfAKind
+  | twoPair /= 3 = twoPair
+  | pair /=3 = pair
+  | otherwise = compareHandType "High Card" pHand cHand
+   where straightFlush = compareHandType "Straight Flush" pHand cHand
+         fourOfAKind = compareHandType "Four of a Kind" pHand cHand
+         fullHouse = compareHandType "Full House" pHand cHand
+         flush = compareHandType "Flush" pHand cHand
+         straight = compareHandType "Straight" pHand cHand
+         threeOfAKind = compareHandType "Three of a Kind" pHand cHand
+         twoPair = compareHandType "Two Pair" pHand cHand
+         pair = compareHandType "Pair" pHand cHand
+
+   
+        
+-- compares a certain hand - passing in name of the hand 
+-- returns 1 if player has that hand, 0 if AI has that hand, 2 if they tie, 3 if neither has the hand
+compareHandType:: String -> ([Char], Int) -> ([Char], Int) -> Int
+compareHandType handType pHand cHand
+  | fst pHand == handType && fst cHand == handType = compareCardValues (snd pHand) (snd cHand)
+  | fst pHand == handType = 1
+  | fst cHand == handType = 0
+  | otherwise = 3
+
+
+-- compare card number values 
+-- returns an Int for the higher card - 1 for the player, 0 for the AI, 2 for same value card
+compareCardValues:: Int -> Int -> Int
+compareCardValues pNumber cNumber 
+  | pNumber > cNumber = 1
+  | cNumber > pNumber = 0
+  | otherwise = 2
+
 
 checkHand:: [Card] -> ([Char], Int)
 checkHand hand 
-  | snd (checkForStraightFlush hand) /= 0 = checkForStraightFlush hand
-  | snd (checkForFour hand) /= 0 = checkForFour hand
-  | snd (checkForFullhouse hand) /= 0 = checkForFullhouse hand
-  | snd (checkForFlush hand) /= 0 = checkForFlush hand
-  | snd (checkForStraight hand) /= 0 = checkForStraight hand
-  | snd (checkForThree hand) /= 0 = checkForThree hand
-  | snd (checkForTwoPair hand) /= 0 =checkForTwoPair hand
-  | snd (checkForPair hand 0) /= 0 = checkForPair hand 0
+  | snd straightFlush /= 0 = straightFlush
+  | snd fourOfAKind /= 0 = fourOfAKind
+  | snd fullHouse /= 0 = fullHouse
+  | snd flush /= 0 = flush
+  | snd straight /= 0 = straight
+  | snd threeOfAKind /= 0 = threeOfAKind
+  | snd twoPair /= 0 = twoPair
+  | snd pair /= 0 = pair
   | otherwise = checkHighCard hand 1
+  where straightFlush = checkForStraightFlush hand
+        fourOfAKind = checkForFour hand
+        fullHouse = checkForFullhouse hand
+        flush = checkForFlush hand
+        straight = checkForStraight hand
+        threeOfAKind = checkForThree hand 
+        twoPair = checkForTwoPair hand
+        pair = checkForPair hand 0
+
 
 
 -- checks best hand and returns who wins
@@ -225,10 +279,10 @@ checkForFlush hand = if length diamonds == 5
 
 checkForFullhouse :: [Card] -> ([Char], Int)
 checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 0))
-                         then ("Fullhouse", snd (checkForThree hand) + snd (checkForPair hand 0))
+                         then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
                          else if (snd (checkForThree hand) /= snd (checkForPair hand 1))
-                              then ("Fullhouse", snd (checkForThree hand) + snd (checkForPair hand 0))
-                              else ("No Fullhouse", 0)
+                              then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
+                              else ("No Full House", 0)
 
 
 checkForStraightFlush :: [Card] -> ([Char], Int)        --Checks for a straight flush, parameter list needs to be sorted by card rank
