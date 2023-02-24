@@ -15,7 +15,15 @@ import Data.List
 import Control.Exception (handle)
 import GHC.Cmm.Dataflow (changedIf)
 
--- state consists of internal state, whether five cards are in the river or not and a string of the winning hand
+{-
+This version of Texas Hold'em uses a previous Blackjack project as a base template -https://github.com/jxwuu/blackjack-.
+Our version of Texas Hold'em implements the checking of all the possible hands. (Straight Flush, Four of a Kind, Full House, Flush,
+Straight, Three of a Kind, Two Pair, Pair, High Card)
+It determines the winner of either the player or the AI based off of these hands, whoever has the best one. 
+-}
+
+
+-- state consists of internal state, whether five cards are in the river or not, and a string of the winning hand
 data State = State InternalState Bool String
          deriving (Ord, Eq, Show)
 
@@ -27,7 +35,6 @@ internal state consists of a 5-tuple with values:
   - cards of the river
 	- boolean indicating current player (True = player, False = CPU)
 -}
---type InternalState = ([Card], [Card], [Card], Bool)
 type InternalState = ([Card], [Card], [Card], [Card], Bool)
 
 -- (suit, value (1 - 13, where ace = 1, jack = 11, queen = 12, king = 13)
@@ -53,14 +60,12 @@ data Action = Bet
 
 
 {-----------GAME FUNCTIONS-----------}
-
-blackjack :: Game
+texasholdem :: Game
 -- if no available actions for either player, do nothing and continue the game
-blackjack Bet (State (pCards, cCards, deck, river, True) fiveCardsDrawn winningHand) =
+texasholdem Bet (State (pCards, cCards, deck, river, True) fiveCardsDrawn winningHand) =
     ContinueGame (State (pCards, cCards, deck, river, False)  fiveCardsDrawn winningHand)
-blackjack Bet (State (pCards, cCards, deck, river, False) fiveCardsDrawn winningHand) =
+texasholdem Bet (State (pCards, cCards, deck, river, False) fiveCardsDrawn winningHand) =
     ContinueGame (State (pCards, cCards, deck, river, True) fiveCardsDrawn winningHand)
-
 
 -- | Draws a card from the deck and adds it to the river 
 drawForRiver :: State -> State
@@ -83,17 +88,17 @@ shuffle xs = do
             vj <- readArray ar j
             writeArray ar j vi
             return vj
-    
     where
       n = length xs
       newArray :: Int -> [a] -> IO (IOArray Int a)
       newArray n xs =  newListArray (1,n) xs
 
--- 
+-- Converts IO [Card] to [Card] for continued use in the game
 processShuffledDeck :: IO [Card] -> [Card]
 processShuffledDeck deck = unsafePerformIO deck
 
 {-----------HELPER FUNCTIONS-----------}
+-- | Draws 2 cards for each player and starts the river with 3 cards
 startingDraw :: Int -> State -> State
 startingDraw 0 (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) = State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand
 startingDraw n (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) 
@@ -105,19 +110,17 @@ startingDraw n (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn w
         shuffledDeck = processShuffledDeck shuffleDeck 
         (newCard,newDeck) = drawFromDeck shuffledDeck 1
 
-
--- returns card drawn and new deck of cards (nth card is drawn from deck)
+-- | Returns card drawn and new deck of cards (nth card is drawn from deck)
 drawFromDeck :: [Card] -> Int -> (Card, [Card])
 drawFromDeck deck n = (deck !! n, [card | card <- deck, card /= (deck !! n)])
 
--- adds up values of a list of cards
+-- | Adds up values of a list of cards
 sumCards :: [Card] -> Int
 sumCards [] = 0
 sumCards ((_,val):tCard) = val + (sumCards tCard)
 
 
--- checks whether the ai or the player has the better hand
--- takes in current state of the game and returns a Result type 
+-- | Checks whether the ai or the player has the better hand
 checkWinner:: State -> Result 
 checkWinner (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand)
     | compareHands pHand cHand == 1 = EndOfGame True (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn (fst pHand)) 
@@ -130,8 +133,8 @@ checkWinner (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winn
             cHand = checkHand cHandAndRiver cCards
 
 
--- compares the hands of both the player and AI
--- returns an Int for the winner - 1 for the player, 0 for the AI, 2 for a tie 
+-- | Compares the hands of both the player and AI
+--   Returns an Int for the winner - 1 for the player, 0 for the AI, 2 for a tie 
 compareHands:: ([Char], Int) -> ([Char], Int) -> Int
 compareHands pHand cHand 
   | straightFlush /= 3 = straightFlush
@@ -154,8 +157,8 @@ compareHands pHand cHand
 
    
         
--- compares a certain hand - passing in name of the hand 
--- returns 1 if player has that hand, 0 if AI has that hand, 2 if they tie, 3 if neither has the hand
+-- | Compares a certain hand - passing in the name of the hand 
+--   Returns 1 if player has that hand, 0 if AI has that hand, 2 if they tie, 3 if neither has the hand
 compareHandType:: String -> ([Char], Int) -> ([Char], Int) -> Int
 compareHandType handType pHand cHand
   | fst pHand == handType && fst cHand == handType = compareCardValues (snd pHand) (snd cHand)
@@ -164,16 +167,16 @@ compareHandType handType pHand cHand
   | otherwise = 3
 
 
--- compare card number values 
--- returns an Int for the higher card - 1 for the player, 0 for the AI, 2 for same value card
+-- | Compare card number values 
+--   Returns an Int for the higher card - 1 for the player, 0 for the AI, 2 for same value card
 compareCardValues:: Int -> Int -> Int
 compareCardValues pNumber cNumber 
   | pNumber > cNumber = 1
   | cNumber > pNumber = 0
   | otherwise = 2
 
--- checks what poker hand a player has
--- returns tuple with string, name of the hand, and the highest card number in the hand
+-- | Checks what poker hand a player has
+--   Returns tuple with string, name of the hand, and the highest card number in the hand
 checkHand:: [Card] -> [Card] -> (String, Int)
 checkHand handWRiver hand
   | snd straightFlush /= 0 = straightFlush
@@ -194,15 +197,13 @@ checkHand handWRiver hand
         twoPair = checkForTwoPair handWRiver
         pair = checkForPair handWRiver 0
 
-
-
--- checks best hand and returns who wins
+-- | Sorts Cards based on their rank in ascending order
 sortCardsAscending :: [Card] -> [Card]
 sortCardsAscending hand = sortOn snd hand
 
 
 -- | Compares two cards by their suit (i.e., by the first element of the tuple)
--- 
+--
 -- >>> sortCardsBySuit [('s', 1), ('d', 13), ('c', 10), ('d', 2), ('s', 2)]
 -- [('c',10),('d',2),('d',13),('s',1),('s',2)]
 compareCardsBySuit :: Card -> Card -> Ordering
@@ -210,19 +211,19 @@ compareCardsBySuit (suit1, rank1) (suit2, rank2)
   | suit1 == suit2 = compare rank1 rank2 -- If the suits are the same, compare the ranks
   | otherwise      = compare suit1 suit2 -- Otherwise, compare the suits
 
--- Sorts a list of cards by suit
+-- | Sorts a list of cards by suit
 sortCardsBySuit :: [Card] -> [Card]
 sortCardsBySuit = sortBy compareCardsBySuit
 
--- Gets the highest value card from a list of cards
+-- | Gets the highest value card from a list of cards
 checkHighCard :: [Card] -> Int -> ([Char], Int)         
 checkHighCard [] cardNum = ("High Card", cardNum)
 checkHighCard (h:t) cardNum = if snd h > cardNum
                               then checkHighCard t (snd h)
                               else checkHighCard t cardNum
 
--- Checks for a pair. If there are multiple pairs, higherPair determines whether the
--- higher pair or lower pair is returned
+-- | Checks for a pair. If there are multiple pairs, higherPair determines whether the
+--   higher pair or lower pair is returned
 checkForPair :: [Card] -> Int -> ([Char], Int)       
 checkForPair hand higherPair = if higherPair == 0                         
                          then case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
@@ -253,40 +254,36 @@ checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) h
 -- | Checks for a Straight.
 -- Need to sort by card value in ascending order using sortCardsAscending function before calling
 checkForStraight :: [Card] -> ([Char], Int)          
-checkForStraight (a:b:c:d:e:f:g:[]) = if [snd c, snd d, snd e, snd f, snd g] == [snd c, snd c+1, snd c+2, snd c+3, snd c+4]
-                                      then ("Straight", snd g)
-                                      else if [snd b, snd c, snd d, snd e, snd f] == [snd b, snd b+1, snd b+2, snd b+3, snd b+4]
-                                           then ("Straight", snd f)
-                                           else if [snd a, snd b, snd c, snd d, snd e] == [snd a, snd a+1, snd a+2, snd a+3, snd a+4]
-                                                then ("Straight", snd e)
-                                                else ("No straight", 0)
+checkForStraight (a:b:c:d:e:f:g:[])  
+  | [snd c, snd d, snd e, snd f, snd g] == [snd c, snd c+1, snd c+2, snd c+3, snd c+4] = ("Straight", snd g)
+  | [snd b, snd c, snd d, snd e, snd f] == [snd b, snd b+1, snd b+2, snd b+3, snd b+4] = ("Straight", snd f)
+  | [snd a, snd b, snd c, snd d, snd e] == [snd a, snd a+1, snd a+2, snd a+3, snd a+4] = ("Straight", snd e)
+  | otherwise = ("No straight", 0)
                     
 -- | Checks for flush. Better flush is the one with the highest card
 checkForFlush :: [Card] -> ([Char], Int)    
 checkForFlush [] = ("No Flush", 0)
-checkForFlush hand = if length diamonds == 5
-                        then ("Flush", snd (checkHighCard diamonds 0))
-                        else if length hearts == 5
-                             then ("Flush", snd (checkHighCard hearts 0))
-                             else if length clubs == 5
-                                  then ("Flush", snd (checkHighCard clubs 0))
-                                  else if length spades == 5
-                                       then ("Flush", snd (checkHighCard spades 0)) 
-                                       else ("No Flush", 0)
-                     where diamonds = filter (\c -> fst c == 'd') hand
-                           hearts = filter (\c -> fst c == 'h') hand
-                           clubs = filter (\c -> fst c == 'c') hand
-                           spades = filter (\c -> fst c == 's') hand
+checkForFlush hand 
+  | length diamonds == 5 = ("Flush", snd (checkHighCard diamonds 0))
+  | length hearts == 5 = ("Flush", snd (checkHighCard hearts 0))
+  | length clubs == 5 = ("Flush", snd (checkHighCard clubs 0))
+  | length spades == 5 = ("Flush", snd (checkHighCard spades 0)) 
+  | otherwise = ("No Flush", 0)
+    where diamonds = filter (\c -> fst c == 'd') hand
+          hearts = filter (\c -> fst c == 'h') hand
+          clubs = filter (\c -> fst c == 'c') hand
+          spades = filter (\c -> fst c == 's') hand
 
 -- | Checks for a Full House. 
 checkForFullhouse :: [Card] -> ([Char], Int)
-checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 0)) && snd (checkForThree hand) /= 0
-                         then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
-                         else if (snd (checkForThree hand) /= snd (checkForPair hand 1) && snd (checkForThree hand) /= 0)
-                              then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
-                              else ("No Full House", 0)
+checkForFullhouse hand 
+  | (snd (checkForThree hand) /= snd (checkForPair hand 0)) && snd (checkForThree hand) /= 0 
+    = ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
+  | (snd (checkForThree hand) /= snd (checkForPair hand 1) && snd (checkForThree hand) /= 0)
+    = ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
+  | otherwise = ("No Full House", 0)
 
--- Checks for a straight flush, parameter list needs to be sorted by card suit
+-- Checks for a straight flush. Parameter list needs to be sorted by card suit
 checkForStraightFlush :: [Card] -> ([Char], Int)        
 checkForStraightFlush hand =
   case hand of
@@ -300,13 +297,9 @@ checkForStraightFlush hand =
             else ("No straight Flush", 0)
     _ -> ("Invalid input", 0)
 
-
-
--- averages the card values in the deck
+-- | Averages the card values in the deck
 avrg :: [Card] -> Int
 avrg deck = sumCards deck `div` length deck
-
-
 
 
 {-----------AI FUNCTIONS-----------}
@@ -322,10 +315,7 @@ avrg deck = sumCards deck `div` length deck
 --     2 == draw and don't bet 
 --     3 == draw and bet 
 aiDecide :: (Ord a, Num a, Num p) => [Card] -> a -> p
-aiDecide cHand  pdecision 
-   -- | (21 - fromIntegral (sumCards cHand)) < avg && ((sumCards pHand)-2) < (sumCards cHand)*4 `div` 3  = 1
-   -- | (21 - fromIntegral (sumCards cHand)) < avg && ((sumCards pHand)-2) > (sumCards cHand) = 0
-   -- | (21 - fromIntegral (sumCards cHand)) >= avg && (sumCards pHand) >= (sumCards cHand)*4 `div` 3 = 2
+aiDecide cHand pdecision 
       | (pdecision == 1) = 1
       | sumCards cHand > 1 = 2
       | otherwise = 3
@@ -337,9 +327,10 @@ aiBet :: [Card] -> Int -> Int -> Int -> Int
 aiBet cHand avg money decision 
     | decision == 0 = 0 
     | decision == 2 = 0
-    | decision == 1 &&  (sumCards cHand) `div` 21 * 100 > 66 = (sumCards cHand) * money `div` 100
-    | decision == 1 &&   (sumCards cHand) `div` 21 * 100 <= 66 =  (sumCards cHand) * money `div` 200
+    | decision == 1 && (sumCards cHand) `div` 21 * 100 > 66 = (sumCards cHand) * money `div` 100
+    | decision == 1 &&  (sumCards cHand) `div` 21 * 100 <= 66 =  (sumCards cHand) * money `div` 200
     | otherwise = (sumCards cHand) * money `div` 300
+
 
 
 {-----------CONSTANTS/STARTING STATES-----------}
@@ -351,7 +342,7 @@ aiBet cHand avg money decision
 fullDeck :: [Card]
 fullDeck = [(suit,value) | suit <- ['s','d','h','c'], value <- [1..13]]
 
--- start of new blackjack game
+-- start of new texasholdem game
 newGame :: State
 newGame = State ([], [], fullDeck, [], True) False ""
 
@@ -364,7 +355,7 @@ type Bet = (Int, Int)
 start :: Game -> State -> IO Bet
 start game state = 
     do
-        putStrLn ("Game start! Welcome To BlackJack. Please enter the amount of money that you want to spend.")
+        putStrLn ("Game start! Welcome To Texas Hold'em. Please enter the amount of money that you would like to spend.")
         line <- getLine
         if (all isDigit line && (read line) >= 0) then
             play game state (read line :: Int, read line :: Int)
@@ -379,26 +370,23 @@ play game state (umoney, aimoney) =
   let newState = startingDraw 7 state
       (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) = newState in
     do
-      putStrLn("\n--------------------------\n");
-      putStrLn ("New game - select who starts first:\n1 = quit, 2 = you, 3 = computer")
+      putStrLn("--------------------------\n");
+      putStrLn("New game - Select whether to continue or quit:\n1 = quit \n2 = continue")
       line <- validInput
-      --num <- randomRIO (0, (length deck) - 1) :: IO Int
       if line == 1 then
         do
           putStrLn ("Done! Money Left - User: " ++ show umoney ++ " AI: " ++ show aimoney)
           return (umoney, aimoney)
-      else if line == 2 then 
-          person_play game (ContinueGame (State (pCards, cCards, deck, river, True)   fiveCardsDrawn winningHand)) (umoney, aimoney) 0
-      else
-          ai_play game (ContinueGame (State (pCards, cCards, deck, river, False)   fiveCardsDrawn winningHand)) (umoney, aimoney) 0 0 0
+      else 
+          personPlay game (ContinueGame (State (pCards, cCards, deck, river, True) fiveCardsDrawn winningHand)) (umoney, aimoney) 0
+
 
 -- Player IO handling function
---     0 == stand and don't bet
---     1 == stand and bet 
---     2 == draw and don't bet 
---     3 == draw and bet 
-person_play :: Game -> Result -> Bet -> Int -> IO Bet
-person_play game (ContinueGame state) (umoney, aimoney) value = 
+--     1 == Check i.e. bet 0 
+--     2 == Bet and choose how much
+--     3 == Fold i.e. end current round and lose  
+personPlay :: Game -> Result -> Bet -> Int -> IO Bet
+personPlay game (ContinueGame state) (umoney, aimoney) value = 
     let (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) = state in
       do
         putStrLn ("\nYour hand:         " ++ show pCards)
@@ -408,26 +396,19 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
         putStrLn ("Computer's money:  " ++ show aimoney)
         putStrLn ("Current pool:      " ++ show value)
         num <- randomRIO (0, (length deck) - 1) :: IO Int
-
         if fiveCardsDrawn then
           do 
-            putStrLn("howdy")
-            person_play game (checkWinner state) (umoney, aimoney) value
+            personPlay game (checkWinner state) (umoney, aimoney) value
         else 
-
-        --  if  == False then
-        --   ai_play game (game (Stand) state) (umoney, aimoney) value
           do
-            --putStrLn ("How much do you want to bet?")
             putStrLn ("Do you want to check (1), bet(2) or fold(3)?")
             line <- validInput
-            --num <- randomRIO (0, (length deck) - 1) :: IO Int
             if line == 1 then
               do
                 -- CHECK
                 putStrLn("You chose to check.")
                 -- so user bets 0
-                ai_play game (game (Bet) state) (umoney, aimoney) value 1 0--`debug` ( show $ state)
+                aiPlay game (game (Bet) state) (umoney, aimoney) value 1 0 --`debug` ( show $ state)
             else if line == 2 then 
               -- BET
               do
@@ -435,45 +416,42 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
                   line <- moneyHandle umoney
                   if (line /= -1) then
                     let x = line :: Int in
-                    ai_play game (game (Bet) (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand)) (umoney - x, aimoney) (x+value) 2 x--`debug` ( show $ state)
+                    aiPlay game (game (Bet) (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand)) (umoney - x, aimoney) (x+value) 2 x--`debug` ( show $ state)
                   else
-                    person_play game (Debt state) (umoney, aimoney) value
+                    personPlay game (Debt state) (umoney, aimoney) value
             else 
               -- FOLD
-              person_play game (EndOfGame False state) (umoney, aimoney) value
+              personPlay game (EndOfGame False state) (umoney, aimoney) value
 
 
 
 
-person_play game (EndOfGame player state) (umoney, aimoney) value = 
+personPlay game (EndOfGame player state) (umoney, aimoney) value = 
     let (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) = state in
     do
-        putStrLn(winningHand)
-        result <- update_bet state (umoney, aimoney) value player
+        result <- updateBet state (umoney, aimoney) value player
         endOutput (state)
         play game newGame result
 
-person_play game (Tie state) (umoney, aimoney) value = 
+personPlay game (Tie state) (umoney, aimoney) value = 
     do
-       --putStrLn(winningHand)
        putStrLn ("Tie!")
        endOutput (state)
        play game newGame (umoney, aimoney)
 
-person_play game (Debt state) (umoney, aimoney) value = 
+personPlay game (Debt state) (umoney, aimoney) value = 
     do
        putStrLn ("Bye! Until we meet again!")
        putStrLn ("-------------------------")
-       start blackjack newGame
+       start texasholdem newGame
 
 -- AI IO handling function
-ai_play :: Game -> Result -> Bet -> Int -> Int -> Int -> IO Bet
-ai_play game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
+aiPlay :: Game -> Result -> Bet -> Int -> Int -> Int -> IO Bet
+aiPlay game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
     let riverState = drawForRiver state
         (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) = riverState in
     do
       let aiDecision = aiDecide cCards pDecision
-      print aiDecision
       let computerBet = aiBet cCards (avrg deck) aimoney aiDecision 
       num <- randomRIO (0, (length deck) - 1) :: IO Int
       if aiDecision == 1 -- CHECK
@@ -482,26 +460,26 @@ ai_play game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
               let computerBet = 0
               putStrLn ("AI bet: " ++ show computerBet)
               putStrLn("--------------------------");
-              person_play game (game (Bet) riverState) (umoney, aimoney) value
+              personPlay game (game (Bet) riverState) (umoney, aimoney) value
       else if aiDecision == 2 -- MATCH
         then
             do
               let computerBet = pBet
               putStrLn ("AI bet: " ++ show computerBet)
               putStrLn("--------------------------");
-              person_play game (game (Bet) riverState) (umoney, aimoney - computerBet) (value + computerBet) 
+              personPlay game (game (Bet) riverState) (umoney, aimoney - computerBet) (value + computerBet) 
       else -- FOLD
          do
-              ai_play game (EndOfGame True riverState) (umoney, aimoney) value pDecision pBet
+              aiPlay game (EndOfGame True riverState) (umoney, aimoney) value pDecision pBet
  
-ai_play game (EndOfGame player state) (umoney, aimoney) value pDecision pBet=
+aiPlay game (EndOfGame player state) (umoney, aimoney) value pDecision pBet=
     do
-       result <- update_bet state (umoney, aimoney) value player
+       result <- updateBet state (umoney, aimoney) value player
        endOutput (state)
        putStrLn("--------------------------");
        play game newGame result
 
-ai_play game (Tie state) (umoney, aimoney) value pDecision pBet=
+aiPlay game (Tie state) (umoney, aimoney) value pDecision pBet=
     do
        putStrLn ("Tie!")
        endOutput (state)
@@ -509,34 +487,37 @@ ai_play game (Tie state) (umoney, aimoney) value pDecision pBet=
        play game newGame (umoney + (value `div` 2), aimoney + (value `div` 2))
 
 -- updates the total bet pool and checks the state of the game
-update_bet :: State -> Bet -> Int -> Bool -> IO Bet
-update_bet (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) (umoney, aimoney) value winner
-   | winner == True = do 
-      putStrLn("--------------------------");
-      putStrLn ("You won!")
+updateBet :: State -> Bet -> Int -> Bool -> IO Bet
+updateBet (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) (umoney, aimoney) value winner
+   | winner = do 
+      putStrLn("--------------------------\n");
+      putStrLn ("You won!\n")
       x <- noMoney (umoney + value, aimoney);
       if(x > 1)
        then 
-         start blackjack newGame
+         start texasholdem newGame
       else 
        return (umoney + value, aimoney)
-   | winner == False  = do
-      putStrLn("--------------------------");
-      putStrLn ("AI won!")
+   | otherwise = do
+      putStrLn("--------------------------\n");
+      putStrLn ("AI won!\n")
       x <- noMoney (umoney, aimoney + value);
       if(x > 1)
        then 
-         start blackjack newGame
+         start texasholdem newGame
       else 
        return (umoney, aimoney + value)
   
 
 -- prints out hand at the end of a game
 endOutput :: State -> IO ()
-endOutput (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) = 
+endOutput (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) = 
     do 
         putStrLn ("Your hand:         " ++ show pCards)
         putStrLn ("Computer's hand:   " ++ show cCards)
+        putStrLn ("Current River      " ++ show river)
+        putStrLn ("\nWinning Hand:      " ++ show winningHand)
+
 
 -- checks if you or the ai is out of money 
 noMoney :: (Int,Int) -> IO Int
@@ -593,4 +574,4 @@ validInput = do
         
 
 {-----------Start the program-----------}
---start blackjack newGame
+--start texasholdem newGame
