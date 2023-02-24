@@ -16,7 +16,7 @@ import Control.Exception (handle)
 import GHC.Cmm.Dataflow (changedIf)
 
 -- state consists of internal state and whether a player can Hit again or not
-data State = State InternalState Bool Bool Bool
+data State = State InternalState Bool Bool Bool String
          deriving (Ord, Eq, Show)
 
 {-
@@ -58,10 +58,10 @@ data Action = Hit Int
 
 blackjack :: Game
 -- if no available actions for either player, do nothing and continue the game
-blackjack act (State (pCards, cCards, deck, river, True) False cCanHit fiveCardsDrawn) =
-    ContinueGame (State (pCards, cCards, deck, river, False) False cCanHit fiveCardsDrawn)
-blackjack act (State (pCards, cCards, deck, river,  False) pCanHit False fiveCardsDrawn) =
-    ContinueGame (State (pCards, cCards, deck, river, True) pCanHit False fiveCardsDrawn)
+blackjack act (State (pCards, cCards, deck, river, True) False cCanHit fiveCardsDrawn winningHand) =
+    ContinueGame (State (pCards, cCards, deck, river, False) False cCanHit fiveCardsDrawn winningHand)
+blackjack act (State (pCards, cCards, deck, river,  False) pCanHit False fiveCardsDrawn winningHand) =
+    ContinueGame (State (pCards, cCards, deck, river, True) pCanHit False fiveCardsDrawn winningHand)
 
 -- action = hit (needs to use checkSum to check the sum of a player's card values after a card was drawn,
 --				 and drawFromDeck to draw a card from the deck)
@@ -72,17 +72,17 @@ blackjack act (State (pCards, cCards, deck, river,  False) pCanHit False fiveCar
 --             (newCard,newDeck) = drawFromDeck deck n
 
 -- action = stand (sets player's boolean flag (pCanHit/cCanHit) to False)
-blackjack (Stand) (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-    | pCanHit == cCanHit && cCanHit == False = checkSum (State (pCards, cCards, deck, river, currPlayer) True True fiveCardsDrawn)
-    | pCanHit == False || cCanHit == False = checkSum (State (pCards, cCards, deck, river, currPlayer) True True fiveCardsDrawn)
-    | currPlayer = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) False cCanHit fiveCardsDrawn)
-    | otherwise = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) pCanHit False fiveCardsDrawn)
+blackjack (Stand) (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+    | pCanHit == cCanHit && cCanHit == False = checkSum (State (pCards, cCards, deck, river, currPlayer) True True fiveCardsDrawn winningHand)
+    | pCanHit == False || cCanHit == False = checkSum (State (pCards, cCards, deck, river, currPlayer) True True fiveCardsDrawn winningHand)
+    | currPlayer = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) False cCanHit fiveCardsDrawn winningHand)
+    | otherwise = ContinueGame (State (pCards, cCards, deck, river, not currPlayer) pCanHit False fiveCardsDrawn winningHand)
 
 
 drawForRiver :: State -> State
-drawForRiver (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) 
-    | length river < 5 = (State (pCards, cCards, newDeckR, riverCard: river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-    | otherwise = (State (pCards, cCards, newDeckR, river, currPlayer) pCanHit cCanHit (not fiveCardsDrawn))
+drawForRiver (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) 
+    | length river < 5 = (State (pCards, cCards, newDeckR, riverCard: river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+    | otherwise = (State (pCards, cCards, newDeckR, river, currPlayer) pCanHit cCanHit (not fiveCardsDrawn) winningHand)
         where 
             (riverCard,newDeckR) = drawFromDeck deck 1
 
@@ -112,11 +112,11 @@ processShuffledDeck deck = unsafePerformIO deck
 {-----------HELPER FUNCTIONS-----------}
 -- State (pCards, cCards, deck, river, currPlayer)
 startingDraw :: Int -> State -> State
-startingDraw 0 (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) = State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn
-startingDraw n (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) 
-  | n > 5 = startingDraw (n-1) (State (newCard:pCards, cCards, newDeck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-  | n > 3 =  startingDraw (n-1) (State (pCards, newCard: cCards, newDeck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-  | otherwise = startingDraw (n-1) (State (pCards, cCards, newDeck, newCard:river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
+startingDraw 0 (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) = State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand
+startingDraw n (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) 
+  | n > 5 = startingDraw (n-1) (State (newCard:pCards, cCards, newDeck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+  | n > 3 =  startingDraw (n-1) (State (pCards, newCard: cCards, newDeck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+  | otherwise = startingDraw (n-1) (State (pCards, cCards, newDeck, newCard:river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
     where 
         shuffleDeck = shuffle deck
         shuffledDeck = processShuffledDeck shuffleDeck 
@@ -135,11 +135,11 @@ sumCards ((_,val):tCard) = val + (sumCards tCard)
 
 -- checks whether a player has exceeded 21
 checkSum :: State -> Result
-checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-    | pSum > 21 || (not pCanHit && not cCanHit && (21 - pSum) > (21 - cSum)) = EndOfGame False (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn)
-    | cSum > 21 || (not pCanHit && not cCanHit && (21 - pSum) < (21 - cSum)) = EndOfGame True (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn)
-    | (not pCanHit && not cCanHit && (21 - pSum) == (21 - cSum)) = Tie (State (pCards, cCards, deck,river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-    | otherwise = ContinueGame (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
+checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+    | pSum > 21 || (not pCanHit && not cCanHit && (21 - pSum) > (21 - cSum)) = EndOfGame False (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn winningHand)
+    | cSum > 21 || (not pCanHit && not cCanHit && (21 - pSum) < (21 - cSum)) = EndOfGame True (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn winningHand)
+    | (not pCanHit && not cCanHit && (21 - pSum) == (21 - cSum)) = Tie (State (pCards, cCards, deck,river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+    | otherwise = ContinueGame (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
       where
         pSum = sumCards pCards
         cSum = sumCards cCards
@@ -147,12 +147,15 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
 -- checks whether the ai or the player has the better hand
 -- takes in current state of the game and returns a Result type 
 checkWinner:: State -> Result 
-checkWinner (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-    | compareHands pHand cHand == 1 = EndOfGame True (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn)
-    | compareHands pHand cHand == 0 = EndOfGame False (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn)
-    | otherwise = Tie (State (pCards, cCards, deck,river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
-      where pHand = checkHand pCards
-            cHand = checkHand cCards 
+checkWinner (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)
+    | compareHands pHand cHand == 1 = EndOfGame True (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn (fst pHand)) 
+    | compareHands pHand cHand == 0 = EndOfGame False (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn (fst cHand))
+    | otherwise = Tie (State (pCards, cCards, deck,river, currPlayer) pCanHit cCanHit fiveCardsDrawn "No winning Hand")
+      where 
+            pHandAndRiver = sortCardsAscending (concat[pCards, river])
+            cHandAndRiver = sortCardsAscending (concat[cCards, river])
+            pHand = checkHand pHandAndRiver pCards
+            cHand = checkHand cHandAndRiver cCards
 
 
 -- compares the hands of both the player and AI
@@ -199,8 +202,8 @@ compareCardValues pNumber cNumber
 
 -- checks what poker hand a player has
 -- returns tuple with string, name of the hand, and the highest card number in the hand
-checkHand:: [Card] -> (String, Int)
-checkHand hand 
+checkHand:: [Card] -> [Card] -> (String, Int)
+checkHand handWRiver hand
   | snd straightFlush /= 0 = straightFlush
   | snd fourOfAKind /= 0 = fourOfAKind
   | snd fullHouse /= 0 = fullHouse
@@ -210,14 +213,14 @@ checkHand hand
   | snd twoPair /= 0 = twoPair
   | snd pair /= 0 = pair
   | otherwise = checkHighCard hand 1
-  where straightFlush = checkForStraightFlush hand
-        fourOfAKind = checkForFour hand
-        fullHouse = checkForFullhouse hand
-        flush = checkForFlush hand
-        straight = checkForStraight hand
-        threeOfAKind = checkForThree hand 
-        twoPair = checkForTwoPair hand
-        pair = checkForPair hand 0
+  where straightFlush = checkForStraightFlush handWRiver
+        fourOfAKind = checkForFour handWRiver
+        fullHouse = checkForFullhouse handWRiver
+        flush = checkForFlush handWRiver
+        straight = checkForStraight handWRiver
+        threeOfAKind = checkForThree handWRiver 
+        twoPair = checkForTwoPair handWRiver
+        pair = checkForPair handWRiver 0
 
 
 
@@ -269,13 +272,13 @@ checkForStraight (a:b:c:d:e:f:g:[]) = if [snd c, snd d, snd e, snd f, snd g] == 
 checkForFlush :: [Card] -> ([Char], Int)    --checks for flush, better flush is the one with the highest card
 checkForFlush [] = ("No Flush", 0)
 checkForFlush hand = if length diamonds == 5
-                        then ("Diamond Flush", snd (checkHighCard diamonds 0))
+                        then ("Flush", snd (checkHighCard diamonds 0))
                         else if length hearts == 5
-                             then ("Heart Flush", snd (checkHighCard hearts 0))
+                             then ("Flush", snd (checkHighCard hearts 0))
                              else if length clubs == 5
-                                  then ("Club Flush", snd (checkHighCard clubs 0))
+                                  then ("Flush", snd (checkHighCard clubs 0))
                                   else if length spades == 5
-                                       then ("Spade Flush", snd (checkHighCard spades 0)) 
+                                       then ("Flush", snd (checkHighCard spades 0)) 
                                        else ("No Flush", 0)
                      where diamonds = filter (\c -> fst c == 'd') hand
                            hearts = filter (\c -> fst c == 'h') hand
@@ -283,9 +286,9 @@ checkForFlush hand = if length diamonds == 5
                            spades = filter (\c -> fst c == 's') hand
 
 checkForFullhouse :: [Card] -> ([Char], Int)
-checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 0))
+checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 0)) && snd (checkForThree hand) /= 0
                          then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
-                         else if (snd (checkForThree hand) /= snd (checkForPair hand 1))
+                         else if (snd (checkForThree hand) /= snd (checkForPair hand 1) && snd (checkForThree hand) /= 0)
                               then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
                               else ("No Full House", 0)
 
@@ -356,7 +359,7 @@ fullDeck = [(suit,value) | suit <- ['s','d','h','c'], value <- [1..13]]
 
 -- start of new blackjack game
 newGame :: State
-newGame = State ([], [], fullDeck, [], True) True True False
+newGame = State ([], [], fullDeck, [], True) True True False ""
 
 {-----------USER INTERFACE-----------}
 
@@ -380,7 +383,7 @@ start game state =
 play :: Game -> State -> Bet -> IO Bet
 play game state (umoney, aimoney) =
   let newState = startingDraw 7 state
-      (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) = newState in
+      (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) = newState in
     do
       putStrLn("\n--------------------------\n");
       putStrLn ("New game - select who starts first:\n1 = quit, 2 = you, 3 = computer")
@@ -391,9 +394,9 @@ play game state (umoney, aimoney) =
           putStrLn ("Done! Money Left - User: " ++ show umoney ++ " AI: " ++ show aimoney)
           return (umoney, aimoney)
       else if line == 2 then 
-          person_play game (ContinueGame (State (pCards, cCards, deck, river, True) pCanHit cCanHit fiveCardsDrawn)) (umoney, aimoney) 0
+          person_play game (ContinueGame (State (pCards, cCards, deck, river, True) pCanHit cCanHit fiveCardsDrawn winningHand)) (umoney, aimoney) 0
       else
-          ai_play game (ContinueGame (State (pCards, cCards, deck, river, False) pCanHit cCanHit fiveCardsDrawn)) (umoney, aimoney) 0 0 0
+          ai_play game (ContinueGame (State (pCards, cCards, deck, river, False) pCanHit cCanHit fiveCardsDrawn winningHand)) (umoney, aimoney) 0 0 0
 
 -- Player IO handling function
 --     0 == stand and don't bet
@@ -402,7 +405,7 @@ play game state (umoney, aimoney) =
 --     3 == draw and bet 
 person_play :: Game -> Result -> Bet -> Int -> IO Bet
 person_play game (ContinueGame state) (umoney, aimoney) value = 
-    let (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) = state in
+    let (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) = state in
       do
         putStrLn ("\nYour hand:         " ++ show pCards)
         putStrLn ("Computer's hand:   " ++ show cCards)
@@ -417,7 +420,7 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
         if fiveCardsDrawn then
           do 
             putStrLn("howdy")
-            ai_play game (game (Stand) state) (umoney, aimoney) value 1 0
+            person_play game (checkWinner state) (umoney, aimoney) value
         else 
 
         --  if pCanHit == False then
@@ -440,7 +443,7 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
                   line <- moneyHandle umoney
                   if (line /= -1) then
                     let x = line :: Int in
-                    ai_play game (game (Stand) (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)) (umoney - x, aimoney) (x+value) 2 x--`debug` ( show $ state)
+                    ai_play game (game (Stand) (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand)) (umoney - x, aimoney) (x+value) 2 x--`debug` ( show $ state)
                   else
                     person_play game (Debt state) (umoney, aimoney) value
             else 
@@ -451,14 +454,16 @@ person_play game (ContinueGame state) (umoney, aimoney) value =
 
 
 person_play game (EndOfGame player state) (umoney, aimoney) value = 
-    let (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) = state in
+    let (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) = state in
     do
-        result <- update_bet state (umoney, aimoney) value
+        putStrLn(winningHand)
+        result <- update_bet state (umoney, aimoney) value player
         endOutput (state)
         play game newGame result
 
 person_play game (Tie state) (umoney, aimoney) value = 
     do
+       --putStrLn(winningHand)
        putStrLn ("Tie!")
        endOutput (state)
        play game newGame (umoney, aimoney)
@@ -473,7 +478,7 @@ person_play game (Debt state) (umoney, aimoney) value =
 ai_play :: Game -> Result -> Bet -> Int -> Int -> Int -> IO Bet
 ai_play game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
     let riverState = drawForRiver state
-        (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) = riverState in
+        (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) = riverState in
     do
       let aiDecision = aiDecide cCards pDecision
       print aiDecision
@@ -500,7 +505,7 @@ ai_play game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
  
 ai_play game (EndOfGame player state) (umoney, aimoney) value pDecision pBet=
     do
-       result <- update_bet state (umoney, aimoney) value
+       result <- update_bet state (umoney, aimoney) value player
        endOutput (state)
        putStrLn("--------------------------");
        play game newGame result
@@ -513,9 +518,9 @@ ai_play game (Tie state) (umoney, aimoney) value pDecision pBet=
        play game newGame (umoney + (value `div` 2), aimoney + (value `div` 2))
 
 -- updates the total bet pool and checks the state of the game
-update_bet :: State -> Bet -> Int -> IO Bet
-update_bet (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) (umoney, aimoney) value
-   | (sumCards pCards) < 21 && (sumCards cCards) < (sumCards pCards) = do 
+update_bet :: State -> Bet -> Int -> Bool -> IO Bet
+update_bet (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) (umoney, aimoney) value winner
+   | winner == True = do 
       putStrLn("--------------------------");
       putStrLn ("You won!")
       x <- noMoney (umoney + value, aimoney);
@@ -524,7 +529,7 @@ update_bet (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit five
          start blackjack newGame
       else 
        return (umoney + value, aimoney)
-   | (sumCards cCards) < 21 && (sumCards cCards) > (sumCards pCards)  = do
+   | winner == False  = do
       putStrLn("--------------------------");
       putStrLn ("AI won!")
       x <- noMoney (umoney, aimoney + value);
@@ -533,64 +538,11 @@ update_bet (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit five
          start blackjack newGame
       else 
        return (umoney, aimoney + value)
-   | (sumCards pCards) > 21 && (sumCards cCards) > 21 = do
-      putStrLn("--------------------------");
-      putStrLn ("Both lose!")
-      x <- noMoney (umoney, aimoney);
-      if(x > 1)
-       then 
-         start blackjack newGame
-      else 
-       return (umoney, aimoney)
-   | (sumCards pCards) == 21 = do
-      putStrLn("--------------------------");
-      putStrLn("You win!")
-      x <- noMoney (umoney + value, aimoney);
-      if(x > 1)
-       then 
-         start blackjack newGame
-      else 
-       return (umoney + value, aimoney) 
-   | (sumCards cCards) == 21 = do
-      putStrLn("--------------------------");
-      putStrLn("AI won!")
-      x <- noMoney (umoney, aimoney + value);
-      if(x > 1)
-       then 
-         start blackjack newGame
-      else 
-       return (umoney, aimoney + value) 
-   | (sumCards pCards) < 21 && (sumCards cCards) > 21 = do
-      putStrLn("--------------------------");
-      putStrLn("You Won")
-      x <- noMoney (umoney + value, aimoney);
-      if(x > 1)
-       then 
-         start blackjack newGame
-      else 
-       return (umoney + value, aimoney) 
-   | (sumCards cCards) < 21 && (sumCards pCards) > 21 = do
-      putStrLn("--------------------------");
-      putStrLn("AI Won")
-      x <- noMoney (umoney, aimoney+ value);
-      if(x > 1)
-       then 
-         start blackjack newGame
-      else 
-       return (umoney, aimoney + value) 
-   | otherwise = do 
-      putStrLn("--------------------------");
-      putStrLn("AI Won")
-      x <- noMoney (umoney, aimoney + value);
-      if(x > 1)
-       then 
-         start blackjack newGame
-      else 
-       return (umoney, aimoney + value) 
+  
 
 -- prints out hand at the end of a game
 endOutput :: State -> IO ()
-endOutput (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn) = 
+endOutput (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn winningHand) = 
     do 
         putStrLn ("Your hand:         " ++ show pCards)
         putStrLn ("Computer's hand:   " ++ show cCards)
