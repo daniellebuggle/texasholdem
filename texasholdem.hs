@@ -146,9 +146,13 @@ checkSum (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCa
 
 -- checks whether the ai or the player has the better hand
 -- takes in current state of the game and returns a Result type 
---checkWinner:: State -> Result 
---checkWinner (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
---  | 
+checkWinner:: State -> Result 
+checkWinner (State (pCards, cCards, deck, river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
+    | compareHands pHand cHand == 1 = EndOfGame True (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn)
+    | compareHands pHand cHand == 0 = EndOfGame False (State (pCards, cCards, deck, river, currPlayer) False False fiveCardsDrawn)
+    | otherwise = Tie (State (pCards, cCards, deck,river, currPlayer) pCanHit cCanHit fiveCardsDrawn)
+      where pHand = checkHand pCards
+            cHand = checkHand cCards 
 
 
 -- compares the hands of both the player and AI
@@ -193,8 +197,9 @@ compareCardValues pNumber cNumber
   | cNumber > pNumber = 0
   | otherwise = 2
 
-
-checkHand:: [Card] -> ([Char], Int)
+-- checks what poker hand a player has
+-- returns tuple with string, name of the hand, and the highest card number in the hand
+checkHand:: [Card] -> (String, Int)
 checkHand hand 
   | snd straightFlush /= 0 = straightFlush
   | snd fourOfAKind /= 0 = fourOfAKind
