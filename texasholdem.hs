@@ -94,7 +94,6 @@ processShuffledDeck :: IO [Card] -> [Card]
 processShuffledDeck deck = unsafePerformIO deck
 
 {-----------HELPER FUNCTIONS-----------}
--- State (pCards, cCards, deck, river, currPlayer)
 startingDraw :: Int -> State -> State
 startingDraw 0 (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) = State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand
 startingDraw n (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) 
@@ -106,9 +105,8 @@ startingDraw n (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn w
         shuffledDeck = processShuffledDeck shuffleDeck 
         (newCard,newDeck) = drawFromDeck shuffledDeck 1
 
+
 -- returns card drawn and new deck of cards (nth card is drawn from deck)
-
-
 drawFromDeck :: [Card] -> Int -> (Card, [Card])
 drawFromDeck deck n = (deck !! n, [card | card <- deck, card /= (deck !! n)])
 
@@ -202,14 +200,31 @@ checkHand handWRiver hand
 sortCardsAscending :: [Card] -> [Card]
 sortCardsAscending hand = sortOn snd hand
 
-checkHighCard :: [Card] -> Int -> ([Char], Int)         --Gets the highest value card from a list of cards
+
+-- Define a function that compares two cards by their suit (i.e., by the first element of the tuple)
+-- 
+-- >>> sortCardsBySuit [('s', 1), ('d', 13), ('c', 10), ('d', 2), ('s', 2)]
+-- [('c',10),('d',2),('d',13),('s',1),('s',2)]
+compareCardsBySuit :: Card -> Card -> Ordering
+compareCardsBySuit (suit1, rank1) (suit2, rank2)
+  | suit1 == suit2 = compare rank1 rank2 -- If the suits are the same, compare the ranks
+  | otherwise      = compare suit1 suit2 -- Otherwise, compare the suits
+
+-- Define a function that sorts a list of cards by suit
+sortCardsBySuit :: [Card] -> [Card]
+sortCardsBySuit = sortBy compareCardsBySuit
+
+-- Gets the highest value card from a list of cards
+checkHighCard :: [Card] -> Int -> ([Char], Int)         
 checkHighCard [] cardNum = ("High Card", cardNum)
 checkHighCard (h:t) cardNum = if snd h > cardNum
                               then checkHighCard t (snd h)
                               else checkHighCard t cardNum
 
-checkForPair :: [Card] -> Int -> ([Char], Int)      --Checks for a pair. If there are multiple pairs, higherPair determines whether the 
-checkForPair hand higherPair = if higherPair == 0                          --higher pair or lower pair is returned
+-- Checks for a pair. If there are multiple pairs, higherPair determines whether the
+-- higher pair or lower pair is returned
+checkForPair :: [Card] -> Int -> ([Char], Int)       
+checkForPair hand higherPair = if higherPair == 0                         
                          then case find (\x -> length x == 2) [filter (\c -> snd c == v) hand | v <- [1..13]] of
                                Just xs -> ("Pair", snd $ head xs)
                                Nothing -> ("Pair", 0)
@@ -217,23 +232,27 @@ checkForPair hand higherPair = if higherPair == 0                          --hig
                                Just xs -> ("Pair", snd $ head xs)
                                Nothing -> ("Pair", 0)
 
+-- | Checks for Two Pair. Uses checkForPair to make differentiate and find different pairs
 checkForTwoPair :: [Card] -> ([Char], Int)
 checkForTwoPair hand = if checkForPair hand 0 == checkForPair hand 1
                        then ("No Two Pair", 0)
                        else ("Two Pair", snd (checkForPair hand 0) + snd (checkForPair hand 1))
 
+-- | Checks for 3 of a Kind.
 checkForThree :: [Card] -> ([Char], Int)
 checkForThree hand = case find (\x -> length x == 3) [filter (\c -> snd c == v) hand | v <- [1..13]] of
                       Just xs -> ("Three of a Kind", snd $ head xs)
                       Nothing -> ("Three of a Kind", 0)
-                   
+
+-- | Checks for 4 of a Kind.                  
 checkForFour :: [Card] -> ([Char], Int)
 checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) hand | v <- [1..13]] of
                       Just xs -> ("Four of a Kind", snd $ head xs)
                       Nothing -> ("Four of a Kind", 0)  
 
-
-checkForStraight :: [Card] -> ([Char], Int)          --Need to sort by card value in ascending order using sortCardsAscending function before calling
+-- | Checks for a Straight.
+-- Need to sort by card value in ascending order using sortCardsAscending function before calling
+checkForStraight :: [Card] -> ([Char], Int)          
 checkForStraight (a:b:c:d:e:f:g:[]) = if [snd c, snd d, snd e, snd f, snd g] == [snd c, snd c+1, snd c+2, snd c+3, snd c+4]
                                       then ("Straight", snd g)
                                       else if [snd b, snd c, snd d, snd e, snd f] == [snd b, snd b+1, snd b+2, snd b+3, snd b+4]
@@ -242,8 +261,8 @@ checkForStraight (a:b:c:d:e:f:g:[]) = if [snd c, snd d, snd e, snd f, snd g] == 
                                                 then ("Straight", snd e)
                                                 else ("No straight", 0)
                     
-
-checkForFlush :: [Card] -> ([Char], Int)    --checks for flush, better flush is the one with the highest card
+-- | Checks for flush. Better flush is the one with the highest card
+checkForFlush :: [Card] -> ([Char], Int)    
 checkForFlush [] = ("No Flush", 0)
 checkForFlush hand = if length diamonds == 5
                         then ("Flush", snd (checkHighCard diamonds 0))
@@ -259,6 +278,7 @@ checkForFlush hand = if length diamonds == 5
                            clubs = filter (\c -> fst c == 'c') hand
                            spades = filter (\c -> fst c == 's') hand
 
+-- | Checks for a Full House. 
 checkForFullhouse :: [Card] -> ([Char], Int)
 checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 0)) && snd (checkForThree hand) /= 0
                          then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
@@ -266,8 +286,8 @@ checkForFullhouse hand = if (snd (checkForThree hand) /= snd (checkForPair hand 
                               then ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
                               else ("No Full House", 0)
 
-
-checkForStraightFlush :: [Card] -> ([Char], Int)        --Checks for a straight flush, parameter list needs to be sorted by card rank
+-- Checks for a straight flush, parameter list needs to be sorted by card rank
+checkForStraightFlush :: [Card] -> ([Char], Int)        
 checkForStraightFlush hand =
   case hand of
     (a:b:c:d:e:f:g:[]) ->
