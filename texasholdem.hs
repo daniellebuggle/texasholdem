@@ -137,6 +137,7 @@ checkWinner (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winn
 --   Returns an Int for the winner - 1 for the player, 0 for the AI, 2 for a tie 
 compareHands:: ([Char], Int) -> ([Char], Int) -> Int
 compareHands pHand cHand 
+  | royalFlush /= 3 = royalFlush
   | straightFlush /= 3 = straightFlush
   | fourOfAKind /= 3 = fourOfAKind
   | fullHouse /= 3 = fullHouse
@@ -146,7 +147,8 @@ compareHands pHand cHand
   | twoPair /= 3 = twoPair
   | pair /=3 = pair
   | otherwise = compareHandType "High Card" pHand cHand
-   where straightFlush = compareHandType "Straight Flush" pHand cHand
+   where royalFlush = compareHandType "Royal Flush" pHand cHand
+         straightFlush = compareHandType "Straight Flush" pHand cHand
          fourOfAKind = compareHandType "Four of a Kind" pHand cHand
          fullHouse = compareHandType "Full House" pHand cHand
          flush = compareHandType "Flush" pHand cHand
@@ -179,6 +181,7 @@ compareCardValues pNumber cNumber
 --   Returns tuple with string, name of the hand, and the highest card number in the hand
 checkHand:: [Card] -> [Card] -> (String, Int)
 checkHand handWRiver hand
+  | snd royalFlush /= 0 = royalFlush
   | snd straightFlush /= 0 = straightFlush
   | snd fourOfAKind /= 0 = fourOfAKind
   | snd fullHouse /= 0 = fullHouse
@@ -188,7 +191,8 @@ checkHand handWRiver hand
   | snd twoPair /= 0 = twoPair
   | snd pair /= 0 = pair
   | otherwise = checkHighCard hand 1
-  where straightFlush = checkForStraightFlush (sortCardsBySuit handWRiver)
+  where royalFlush = checkForRoyalFlush cardsBySuit
+        straightFlush = checkForStraightFlush cardsBySuit
         fourOfAKind = checkForFour handWRiver
         fullHouse = checkForFullhouse handWRiver
         flush = checkForFlush handWRiver
@@ -196,6 +200,7 @@ checkHand handWRiver hand
         threeOfAKind = checkForThree handWRiver 
         twoPair = checkForTwoPair handWRiver
         pair = checkForPair handWRiver 0
+        cardsBySuit = sortCardsBySuit handWRiver
 
 -- | Sorts Cards based on their rank in ascending order
 sortCardsAscending :: [Card] -> [Card]
@@ -283,7 +288,7 @@ checkForFullhouse hand
     = ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
   | otherwise = ("No Full House", 0)
 
--- Checks for a straight flush. Parameter list needs to be sorted by card suit
+-- | Checks for a straight flush. Parameter list needs to be sorted by card suit
 checkForStraightFlush :: [Card] -> ([Char], Int)        
 checkForStraightFlush hand =
   case hand of
@@ -297,6 +302,13 @@ checkForStraightFlush hand =
             else ("No straight Flush", 0)
     _ -> ("Invalid input", 0)
 
+-- | Checks for a Royal Flush. 
+--   Royal Flush is Straight flush from 10 to Ace (in our case 9..13)
+--   Check if Straight Flush with largest number as 13 then have Royal Flush
+checkForRoyalFlush :: [Card] -> ([Char], Int)
+checkForRoyalFlush hand 
+  | snd (checkForStraightFlush hand) == 13 = ("Royal Flush", 13)
+  | otherwise = ("No Royal Flush", 0)
 -- | Averages the card values in the deck
 avrg :: [Card] -> Int
 avrg deck = sumCards deck `div` length deck
