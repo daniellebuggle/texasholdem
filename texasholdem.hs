@@ -17,8 +17,8 @@ import GHC.Cmm.Dataflow (changedIf)
 
 {-
 This version of Texas Hold'em uses a previous Blackjack project as a base template -https://github.com/jxwuu/blackjack-.
-Our version of Texas Hold'em implements the checking of all the possible hands. (Straight Flush, Four of a Kind, Full House, Flush,
-Straight, Three of a Kind, Two Pair, Pair, High Card)
+Our version of Texas Hold'em implements the checking of all the possible hands. (Royal Flush, Straight Flush, Four of a Kind, Full House, 
+Flush, Straight, Three of a Kind, Two Pair, Pair, High Card)
 It determines the winner of either the player or the AI based off of these hands, whoever has the best one. 
 -}
 
