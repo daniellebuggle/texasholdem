@@ -37,7 +37,7 @@ internal state consists of a 5-tuple with values:
 -}
 type InternalState = ([Card], [Card], [Card], [Card], Bool)
 
--- (suit, value (1 - 13, where ace = 1, jack = 11, queen = 12, king = 13)
+-- (suit, value (1 - 13, where, jack = 10, queen = 11, king = 12, ace = 13)
 type Card = (Char, Int)
 
 type Player = State -> Action
@@ -61,7 +61,7 @@ data Action = Bet
 
 {-----------GAME FUNCTIONS-----------}
 texasholdem :: Game
--- if no available actions for either player, do nothing and continue the game
+-- after human or AI places a bet, continueGame so next player can place a bet
 texasholdem Bet (State (pCards, cCards, deck, river, True) fiveCardsDrawn winningHand) =
     ContinueGame (State (pCards, cCards, deck, river, False)  fiveCardsDrawn winningHand)
 texasholdem Bet (State (pCards, cCards, deck, river, False) fiveCardsDrawn winningHand) =
@@ -123,9 +123,9 @@ sumCards ((_,val):tCard) = val + (sumCards tCard)
 -- | Checks whether the ai or the player has the better hand
 checkWinner:: State -> Result 
 checkWinner (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand)
-    | compareHands pHand cHand == 1 = EndOfGame True (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn (fst pHand)) 
-    | compareHands pHand cHand == 0 = EndOfGame False (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn (fst cHand))
-    | otherwise = Tie (State (pCards, cCards, deck,river, currPlayer) fiveCardsDrawn "No winning Hand")
+    | compareHands pHand cHand == 1 = EndOfGame True (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn (fst pHand)) 
+    | compareHands pHand cHand == 0 = EndOfGame False (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn (fst cHand))
+    | otherwise = Tie (State (pCards, cCards, deck,river, currPlayer) fiveCardsDrawn winningHand)
       where 
             pHandAndRiver = sortCardsAscending (concat[pCards, river])
             cHandAndRiver = sortCardsAscending (concat[cCards, river])
@@ -193,11 +193,11 @@ checkHand handWRiver hand
   | otherwise = checkHighCard hand 1
   where royalFlush = checkForRoyalFlush cardsBySuit
         straightFlush = checkForStraightFlush cardsBySuit
-        fourOfAKind = checkForFour handWRiver
+        fourOfAKind = checkForKind handWRiver 4 "Four of a Kind"
         fullHouse = checkForFullhouse handWRiver
         flush = checkForFlush handWRiver
         straight = checkForStraight handWRiver
-        threeOfAKind = checkForThree handWRiver 
+        threeOfAKind = checkForKind handWRiver 3 "Three of a Kind"
         twoPair = checkForTwoPair handWRiver
         pair = checkForPair handWRiver 0
         cardsBySuit = sortCardsBySuit handWRiver
@@ -245,16 +245,15 @@ checkForTwoPair hand = if checkForPair hand 0 == checkForPair hand 1
                        else ("Two Pair", snd (checkForPair hand 0) + snd (checkForPair hand 1))
 
 -- | Checks for 3 of a Kind.
-checkForThree :: [Card] -> ([Char], Int)
-checkForThree hand = case find (\x -> length x == 3) [filter (\c -> snd c == v) hand | v <- [1..13]] of
-                      Just xs -> ("Three of a Kind", snd $ head xs)
-                      Nothing -> ("Three of a Kind", 0)
+-- gets sublists of each rank (i.e. list of cards with value 1) in a list,
+-- and checks if any of the sublists has 3 values
 
--- | Checks for 4 of a Kind.                  
-checkForFour :: [Card] -> ([Char], Int)
-checkForFour hand = case find (\x -> length x == 4) [filter (\c -> snd c == v) hand | v <- [1..13]] of
-                      Just xs -> ("Four of a Kind", snd $ head xs)
-                      Nothing -> ("Four of a Kind", 0)  
+
+checkForKind :: [Card] -> Int -> String -> ([Char], Int)
+checkForKind hand num name = case find (\x -> length x == num) [filter (\c -> snd c == v) hand | v <- [1..13]] of
+                      Just xs -> (name, snd $ head xs)
+                      Nothing -> (name, 0)
+
 
 -- | Checks for a Straight.
 -- Need to sort by card value in ascending order using sortCardsAscending function before calling
@@ -282,10 +281,10 @@ checkForFlush hand
 -- | Checks for a Full House. 
 checkForFullhouse :: [Card] -> ([Char], Int)
 checkForFullhouse hand 
-  | (snd (checkForThree hand) /= snd (checkForPair hand 0)) && snd (checkForThree hand) /= 0 
-    = ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
-  | (snd (checkForThree hand) /= snd (checkForPair hand 1) && snd (checkForThree hand) /= 0)
-    = ("Full House", snd (checkForThree hand) + snd (checkForPair hand 0))
+  | (snd (checkForKind hand 3 "Three of a Kind" ) /= snd (checkForPair hand 0)) && snd (checkForKind hand 3 "Three of a Kind") /= 0 
+    = ("Full House", snd (checkForKind hand 3 "Three of a Kind") + snd (checkForPair hand 0))
+  | (snd (checkForKind hand 3 "Three of a Kind") /= snd (checkForPair hand 1) && snd (checkForKind hand 3 "Three of a Kind") /= 0)
+    = ("Full House", snd (checkForKind hand 3 "Three of a Kind") + snd (checkForPair hand 0))
   | otherwise = ("No Full House", 0)
 
 -- | Checks for a straight flush. Parameter list needs to be sorted by card suit
@@ -356,7 +355,7 @@ fullDeck = [(suit,value) | suit <- ['s','d','h','c'], value <- [1..13]]
 
 -- start of new texasholdem game
 newGame :: State
-newGame = State ([], [], fullDeck, [], True) False ""
+newGame = State ([], [], fullDeck, [], True) False "No Winning Hand"
 
 {-----------USER INTERFACE-----------}
 
@@ -461,7 +460,7 @@ personPlay game (Debt state) (umoney, aimoney) value =
 aiPlay :: Game -> Result -> Bet -> Int -> Int -> Int -> IO Bet
 aiPlay game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
     let riverState = drawForRiver state
-        (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) = riverState in
+        (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) = riverState in
     do
       let aiDecision = aiDecide cCards pDecision
       let computerBet = aiBet cCards (avrg deck) aimoney aiDecision 
@@ -477,9 +476,14 @@ aiPlay game (ContinueGame state) (umoney, aimoney) value pDecision pBet =
         then
             do
               let computerBet = pBet
-              putStrLn ("AI bet: " ++ show computerBet)
-              putStrLn("--------------------------");
-              personPlay game (game (Bet) riverState) (umoney, aimoney - computerBet) (value + computerBet) 
+              if aimoney - computerBet < 0
+                then do putStrLn ("AI bet: " ++ show 0) 
+                        let computerBet' = 0
+                        personPlay game (game Bet riverState) (umoney, aimoney - computerBet') (value + computerBet')
+                else do 
+                  putStrLn ("AI bet: " ++ show computerBet)
+                  putStrLn("--------------------------");
+                  personPlay game (game Bet riverState) (umoney, aimoney - computerBet) (value + computerBet)
       else -- FOLD
          do
               aiPlay game (EndOfGame True riverState) (umoney, aimoney) value pDecision pBet
@@ -500,7 +504,7 @@ aiPlay game (Tie state) (umoney, aimoney) value pDecision pBet=
 
 -- updates the total bet pool and checks the state of the game
 updateBet :: State -> Bet -> Int -> Bool -> IO Bet
-updateBet (State (pCards, cCards, deck, river, currPlayer)   fiveCardsDrawn winningHand) (umoney, aimoney) value winner
+updateBet (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winningHand) (umoney, aimoney) value winner
    | winner = do 
       putStrLn("--------------------------\n");
       putStrLn ("You won!\n")
