@@ -281,9 +281,9 @@ checkForFlush hand
 -- | Checks for a Full House. 
 checkForFullhouse :: [Card] -> ([Char], Int)
 checkForFullhouse hand 
-  | (snd (checkForKind hand 3 "Three of a Kind" ) /= snd (checkForPair hand 0)) && snd (checkForKind hand 3 "Three of a Kind") /= 0 
+  | snd (checkForKind hand 3 "Three of a Kind") /= 0 && snd(checkForPair hand 0)/=0
     = ("Full House", snd (checkForKind hand 3 "Three of a Kind") + snd (checkForPair hand 0))
-  | (snd (checkForKind hand 3 "Three of a Kind") /= snd (checkForPair hand 1) && snd (checkForKind hand 3 "Three of a Kind") /= 0)
+  | snd (checkForKind hand 3 "Three of a Kind") /= 0 && snd(checkForPair hand 1)/=0
     = ("Full House", snd (checkForKind hand 3 "Three of a Kind") + snd (checkForPair hand 0))
   | otherwise = ("No Full House", 0)
 
@@ -448,7 +448,7 @@ personPlay game (Tie state) (umoney, aimoney) value =
     do
        putStrLn ("Tie!")
        endOutput (state)
-       play game newGame (umoney, aimoney)
+       play game newGame (umoney + (value `div` 2), aimoney + (value `div` 2))
 
 personPlay game (Debt state) (umoney, aimoney) value = 
     do
