@@ -137,15 +137,15 @@ checkWinner (State (pCards, cCards, deck, river, currPlayer) fiveCardsDrawn winn
 --   Returns an Int for the winner - 1 for the player, 0 for the AI, 2 for a tie 
 compareHands:: ([Char], Int) -> ([Char], Int) -> Int
 compareHands pHand cHand 
-  | royalFlush /= 3 = royalFlush
-  | straightFlush /= 3 = straightFlush
-  | fourOfAKind /= 3 = fourOfAKind
-  | fullHouse /= 3 = fullHouse
-  | flush /= 3 = flush
-  | straight /=3 = straight
-  | threeOfAKind /=3 = threeOfAKind
-  | twoPair /= 3 = twoPair
-  | pair /=3 = pair
+  | royalFlush < 2 = royalFlush
+  | straightFlush < 2 = straightFlush
+  | fourOfAKind < 2 = fourOfAKind
+  | fullHouse < 2 = fullHouse
+  | flush < 2 = flush
+  | straight < 2 = straight
+  | threeOfAKind < 2 = threeOfAKind
+  | twoPair < 2 = twoPair
+  | pair < 2 = pair
   | otherwise = compareHandType "High Card" pHand cHand
    where royalFlush = compareHandType "Royal Flush" pHand cHand
          straightFlush = compareHandType "Straight Flush" pHand cHand
