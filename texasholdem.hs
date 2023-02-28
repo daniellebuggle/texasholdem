@@ -388,8 +388,12 @@ play game state (umoney, aimoney) =
         do
           putStrLn ("Done! Money Left - User: " ++ show umoney ++ " AI: " ++ show aimoney)
           return (umoney, aimoney)
-      else 
+      else if line == 2 then
           personPlay game (ContinueGame (State (pCards, cCards, deck, river, True) fiveCardsDrawn winningHand)) (umoney, aimoney) 0
+      else 
+        do 
+          putStrLn("Please enter valid integer.");
+          play game state (umoney, aimoney)
 
 
 -- Player IO handling function
